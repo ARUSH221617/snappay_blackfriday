@@ -389,7 +389,7 @@ class SnappBot:
             products = self.ai.extract_campaign_products(page)
             
             # 2. SAVE FOR DEBUGGING
-            debug_filename = "debug_products.json"
+            debug_filename = "debug_products_step3.json"
             try:
                 with open(debug_filename, "w", encoding="utf-8") as f:
                     json.dump(products, f, ensure_ascii=False, indent=2)
