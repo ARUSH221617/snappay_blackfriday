@@ -330,26 +330,41 @@ class SnappBot:
             self.log("❌ Could not load login page.")
             return
 
-        time.sleep(2)
-
         needs_login = True
         
-        # Check if already logged in (redirected or input missing)
+        # Check if already logged in (redirected)
+        # Wait a moment for potential redirects or load
+        try:
+             page.wait_for_load_state("networkidle", timeout=5000)
+        except:
+             pass
+
         if "login" not in page.url:
             self.log(f"✅ Already logged in (URL: {page.url}).")
             needs_login = False
         else:
+            self.log("   -> Waiting for login inputs...")
             is_login_page = False
             try:
-                if page.locator('[aria-label="شمارهٔ موبایل"]').is_visible() or \
-                   page.locator("input[type='tel']").is_visible():
-                    is_login_page = True
-            except:
-                pass
+                # Wait for the mobile input field to appear
+                page.wait_for_selector('[aria-label="شمارهٔ موبایل"], input[type="tel"]', state="visible", timeout=10000)
+                is_login_page = True
+            except PlaywrightTimeout:
+                self.log("   -> Standard login inputs not found within timeout.")
+            except Exception as e:
+                self.log(f"   -> Error checking for login inputs: {e}")
 
-            if not is_login_page:
-                self.log("✅ Already logged in (Login inputs not found).")
-                needs_login = False
+            if is_login_page:
+                 self.log("   -> Login inputs found. Proceeding.")
+                 needs_login = True
+            else:
+                 # If inputs not found, double check URL
+                 if "login" not in page.url:
+                      self.log(f"✅ Already logged in (URL: {page.url}).")
+                      needs_login = False
+                 else:
+                      self.log("⚠️ Login inputs missing but still on login page. Will attempt fallback/AI detection.")
+                      needs_login = True
 
         if needs_login:
             # 1. Fill Phone
