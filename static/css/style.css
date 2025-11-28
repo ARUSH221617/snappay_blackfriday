@@ -1,0 +1,247 @@
+:root {
+    --bg-color: #121212;
+    --card-bg: #1e1e1e;
+    --text-primary: #e0e0e0;
+    --text-secondary: #a0a0a0;
+    --accent-primary: #3d8bff;
+    --accent-success: #4caf50;
+    --accent-danger: #f44336;
+    --accent-warning: #ff9800;
+    --input-bg: #2d2d2d;
+    --border-color: #333;
+    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono-font: "JetBrains Mono", Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    font-family: var(--font-family);
+    line-height: 1.6;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header */
+header {
+    background-color: var(--card-bg);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.status-badge::before {
+    content: '';
+    display: block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: currentColor;
+}
+
+.status-running {
+    background-color: rgba(76, 175, 80, 0.1);
+    color: var(--accent-success);
+}
+
+.status-stopped {
+    background-color: rgba(244, 67, 54, 0.1);
+    color: var(--accent-danger);
+}
+
+.status-waiting {
+    background-color: rgba(255, 152, 0, 0.1);
+    color: var(--accent-warning);
+}
+
+/* Main Content */
+main {
+    flex: 1;
+    padding: 2rem;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 1.5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* Controls Section */
+.controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+button {
+    background-color: var(--accent-primary);
+    color: white;
+    border: none;
+    padding: 0.5rem 1.5rem;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+    font-weight: 500;
+}
+
+button:hover {
+    background-color: #2970d6;
+}
+
+button:active {
+    transform: scale(0.98);
+}
+
+button:disabled {
+    background-color: var(--border-color);
+    color: var(--text-secondary);
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Input Modal/Area */
+.input-area {
+    background-color: var(--card-bg);
+    border: 1px solid var(--accent-warning);
+    border-radius: 8px;
+    padding: 1.5rem;
+    display: none; /* Toggled via JS */
+    animation: slideDown 0.3s ease-out;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.input-area.active {
+    display: block;
+}
+
+.input-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    color: var(--accent-warning);
+    font-weight: 600;
+}
+
+.input-group {
+    display: flex;
+    gap: 0.5rem;
+}
+
+input[type="text"] {
+    flex: 1;
+    background-color: var(--input-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+input[type="text"]:focus {
+    border-color: var(--accent-primary);
+}
+
+/* Logs */
+.log-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    height: 100%;
+    min-height: 0; /* Important for grid overflow */
+}
+
+.log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.log-container {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    font-family: var(--mono-font);
+    font-size: 0.9rem;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    scroll-behavior: smooth;
+}
+
+.log-entry {
+    padding: 2px 0;
+    word-break: break-all;
+    border-left: 3px solid transparent;
+    padding-left: 8px;
+}
+
+.log-entry:hover {
+    background-color: rgba(255,255,255,0.02);
+}
+
+/* Log highlighting based on content (can be done in JS, but basic classes here) */
+.log-info { color: var(--text-primary); }
+.log-error { color: var(--accent-danger); border-left-color: var(--accent-danger); }
+.log-warning { color: var(--accent-warning); border-left-color: var(--accent-warning); }
+.log-input { color: var(--accent-primary); border-left-color: var(--accent-primary); }
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-color);
+}
+
+::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
