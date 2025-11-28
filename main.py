@@ -347,10 +347,20 @@ class SnappBot:
             is_login_page = False
             try:
                 # Wait for the mobile input field to appear
-                page.wait_for_selector('[aria-label="شمارهٔ موبایل"], input[type="tel"]', state="visible", timeout=10000)
+                # Added more selectors: name="cellphone", placeholder containing 'mobile' or 'موبایل'
+                page.wait_for_selector('[aria-label="شمارهٔ موبایل"], input[type="tel"], input[name="cellphone"], input[placeholder*="موبایل"], input[placeholder*="mobile"]', state="visible", timeout=10000)
                 is_login_page = True
             except PlaywrightTimeout:
                 self.log("   -> Standard login inputs not found within timeout.")
+
+                # Debug: Dump HTML if selectors fail
+                try:
+                    with open("login_debug.html", "w", encoding="utf-8") as f:
+                        f.write(page.content())
+                    self.log("   -> 💾 Dumped login page HTML to 'login_debug.html' for analysis.")
+                except Exception as e:
+                    self.log(f"   -> ⚠️ Failed to dump debug HTML: {e}")
+
             except Exception as e:
                 self.log(f"   -> Error checking for login inputs: {e}")
 
@@ -368,22 +378,42 @@ class SnappBot:
 
         if needs_login:
             # 1. Fill Phone
-            try:
-                self.log("   -> Trying specific aria-label selector...")
-                page.locator('[aria-label="شمارهٔ موبایل"]').fill(PHONE_NUMBER)
-                self.log("   -> Clicking submit button...")
-                page.locator('[aria-label="ثبت شماره موبایل"]').click()
-            except:
+            filled = False
+            selectors = [
+                '[aria-label="شمارهٔ موبایل"]',
+                'input[type="tel"]',
+                'input[name="cellphone"]',
+                'input[placeholder*="موبایل"]',
+                'input[placeholder*="mobile"]'
+            ]
+
+            for sel in selectors:
                 try:
-                    self.log("   -> Specific selector failed. Trying generic...")
-                    page.locator("input[type='tel']").fill(PHONE_NUMBER)
-                    page.keyboard.press("Enter")
+                    self.log(f"   -> Trying selector: {sel}")
+                    if page.locator(sel).first.is_visible():
+                        page.locator(sel).first.fill(PHONE_NUMBER)
+                        filled = True
+                        # Try to press enter or click submit
+                        try:
+                            page.keyboard.press("Enter")
+                        except:
+                            pass
+
+                        # Try to find submit button if Enter didn't work (check if still on same page?)
+                        # But simpler to just break if filled
+                        break
                 except:
-                    self.log("   -> Generic failed. Asking AI...")
-                    selector_phone = self.ai.find_selector(page, "The input field for mobile number")
-                    if selector_phone:
-                        page.locator(selector_phone).first.fill(PHONE_NUMBER)
-                        page.keyboard.press("Enter")
+                    pass
+
+            if not filled:
+                try:
+                     self.log("   -> All hardcoded selectors failed. Asking AI...")
+                     selector_phone = self.ai.find_selector(page, "The input field for mobile number")
+                     if selector_phone:
+                         page.locator(selector_phone).first.fill(PHONE_NUMBER)
+                         page.keyboard.press("Enter")
+                except Exception as e:
+                    self.log(f"   -> AI selector extraction failed: {e}")
 
             # 2. OTP Entry
             self.log("\n👉 ACTION: Please check SMS.")
