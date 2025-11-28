@@ -251,6 +251,19 @@ class SnappBot:
             return
 
         time.sleep(3) # Short wait for JS
+
+        # Try to click the "دیجیتال" button
+        try:
+            self.log("   -> Searching for 'دیجیتال' button...")
+            digital_btn = page.locator("text=دیجیتال").first
+            if digital_btn.count() > 0:
+                self.log("   -> Found 'دیجیتال' button. Clicking...")
+                digital_btn.click()
+                time.sleep(2)  # Wait for content update
+            else:
+                self.log("   -> 'دیجیتال' button not found.")
+        except Exception as e:
+            self.log(f"   -> Error interacting with 'دیجیتال' button: {e}")
         
         products = self.ai.extract_timetable(page)
         
@@ -287,8 +300,32 @@ class SnappBot:
             self.target_time = datetime.now().strftime("%H:%M")
             self.log(f"⚠️ Using immediate time: {self.target_time}")
 
+    def wait_for_target_time(self):
+        if self.target_time:
+            self.log(f"⏳ Waiting for Target Time: {self.target_time}...")
+            while True:
+                current_time = datetime.now().strftime("%H:%M")
+                if current_time == self.target_time:
+                    self.log("🚨 TIME MATCHED! GO!")
+                    break
+                time.sleep(1)
+
     def step_2_login(self, page):
         self.log("\n--- STEP 2: Login Flow ---")
+
+        # Optimization: Check if session file exists
+        if os.path.exists("session.json"):
+             self.log("   -> 📂 Session file found. Verifying session...")
+             # Go to home page instead of login to see if session works
+             if self.safe_goto(page, "https://app.snapp.taxi/"):
+                 time.sleep(3)
+                 if "login" not in page.url:
+                      self.log(f"✅ Session valid. Already logged in (URL: {page.url}).")
+                      self.wait_for_target_time()
+                      return
+                 else:
+                      self.log("   -> Session invalid (redirected to login).")
+
         if not self.safe_goto(page, "https://app.snapp.taxi/login"):
             self.log("❌ Could not load login page.")
             return
@@ -361,14 +398,7 @@ class SnappBot:
                 self.log(f"   -> ⚠️ Failed to save session: {e}")
         
         # 3. Wait Loop
-        if self.target_time:
-            self.log(f"⏳ Waiting for Target Time: {self.target_time}...")
-            while True:
-                current_time = datetime.now().strftime("%H:%M")
-                if current_time == self.target_time:
-                    self.log("🚨 TIME MATCHED! GO!")
-                    break
-                time.sleep(1)
+        self.wait_for_target_time()
 
     def step_3_purchase(self, page):
         self.log("\n--- STEP 3: Purchase ---")
