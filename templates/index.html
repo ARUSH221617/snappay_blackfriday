@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SnappBot Control</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        #log-container {
+            background: #f4f4f4;
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 400px;
+            overflow-y: scroll;
+            font-family: monospace;
+            margin-bottom: 20px;
+        }
+        .controls { margin-bottom: 20px; }
+        .input-area { display: none; background: #e8f0fe; padding: 15px; border-radius: 5px;}
+        .status { font-weight: bold; margin-bottom: 10px; }
+        .running { color: green; }
+        .stopped { color: red; }
+    </style>
+</head>
+<body>
+    <h1>SnappBot Web Interface</h1>
+
+    <div class="status">
+        Status: <span id="status-text" class="stopped">Stopped</span>
+    </div>
+
+    <div class="controls">
+        <button id="start-btn" onclick="startBot()">Start Bot</button>
+    </div>
+
+    <div id="input-area" class="input-area">
+        <h3 id="input-prompt">Bot needs input:</h3>
+        <input type="text" id="user-input" placeholder="Enter value here...">
+        <button onclick="sendInput()">Send</button>
+    </div>
+
+    <h3>Logs</h3>
+    <div id="log-container"></div>
+
+    <script>
+        function updateStatus() {
+            fetch('/api/status')
+                .then(r => r.json())
+                .then(data => {
+                    const statusSpan = document.getElementById('status-text');
+                    const startBtn = document.getElementById('start-btn');
+                    const inputArea = document.getElementById('input-area');
+                    const inputPrompt = document.getElementById('input-prompt');
+
+                    if (data.running) {
+                        statusSpan.textContent = "Running";
+                        statusSpan.className = "running";
+                        startBtn.disabled = true;
+                    } else {
+                        statusSpan.textContent = "Stopped";
+                        statusSpan.className = "stopped";
+                        startBtn.disabled = false;
+                    }
+
+                    if (data.waiting_for_input) {
+                        inputArea.style.display = 'block';
+                        inputPrompt.textContent = data.input_prompt;
+                    } else {
+                        inputArea.style.display = 'none';
+                    }
+                });
+        }
+
+        function fetchLogs() {
+            fetch('/api/logs')
+                .then(r => r.json())
+                .then(data => {
+                    const logContainer = document.getElementById('log-container');
+                    data.logs.forEach(log => {
+                        const div = document.createElement('div');
+                        div.textContent = log;
+                        logContainer.appendChild(div);
+                    });
+                    if (data.logs.length > 0) {
+                        logContainer.scrollTop = logContainer.scrollHeight;
+                    }
+                });
+        }
+
+        function startBot() {
+            fetch('/api/start', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    console.log(data);
+                    updateStatus();
+                });
+        }
+
+        function sendInput() {
+            const val = document.getElementById('user-input').value;
+            fetch('/api/input', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: val })
+            }).then(() => {
+                document.getElementById('user-input').value = '';
+                updateStatus();
+            });
+        }
+
+        setInterval(updateStatus, 1000);
+        setInterval(fetchLogs, 1000);
+        updateStatus();
+    </script>
+</body>
+</html>
