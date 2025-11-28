@@ -210,9 +210,14 @@ class SnappBot:
                 headless=HEADLESS_MODE,
                 args=['--no-sandbox', '--disable-setuid-sandbox']
             )
-            context = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            )
+            context_args = {
+                "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+            if os.path.exists("session.json"):
+                self.log("   -> 📂 Loading saved session from session.json")
+                context_args["storage_state"] = "session.json"
+
+            context = browser.new_context(**context_args)
             page = context.new_page()
 
             # --- STEP 1 LOGIC ---
@@ -289,44 +294,71 @@ class SnappBot:
             return
 
         time.sleep(2)
+
+        needs_login = True
         
-        # 1. Fill Phone
-        try:
-            self.log("   -> Trying specific aria-label selector...")
-            page.locator('[aria-label="شمارهٔ موبایل"]').fill(PHONE_NUMBER)
-            self.log("   -> Clicking submit button...")
-            page.locator('[aria-label="ثبت شماره موبایل"]').click()
-        except:
+        # Check if already logged in (redirected or input missing)
+        if "login" not in page.url:
+            self.log(f"✅ Already logged in (URL: {page.url}).")
+            needs_login = False
+        else:
+            is_login_page = False
             try:
-                self.log("   -> Specific selector failed. Trying generic...")
-                page.locator("input[type='tel']").fill(PHONE_NUMBER)
-                page.keyboard.press("Enter")
+                if page.locator('[aria-label="شمارهٔ موبایل"]').is_visible() or \
+                   page.locator("input[type='tel']").is_visible():
+                    is_login_page = True
             except:
-                self.log("   -> Generic failed. Asking AI...")
-                selector_phone = self.ai.find_selector(page, "The input field for mobile number")
-                if selector_phone:
-                    page.locator(selector_phone).first.fill(PHONE_NUMBER)
+                pass
+
+            if not is_login_page:
+                self.log("✅ Already logged in (Login inputs not found).")
+                needs_login = False
+
+        if needs_login:
+            # 1. Fill Phone
+            try:
+                self.log("   -> Trying specific aria-label selector...")
+                page.locator('[aria-label="شمارهٔ موبایل"]').fill(PHONE_NUMBER)
+                self.log("   -> Clicking submit button...")
+                page.locator('[aria-label="ثبت شماره موبایل"]').click()
+            except:
+                try:
+                    self.log("   -> Specific selector failed. Trying generic...")
+                    page.locator("input[type='tel']").fill(PHONE_NUMBER)
                     page.keyboard.press("Enter")
+                except:
+                    self.log("   -> Generic failed. Asking AI...")
+                    selector_phone = self.ai.find_selector(page, "The input field for mobile number")
+                    if selector_phone:
+                        page.locator(selector_phone).first.fill(PHONE_NUMBER)
+                        page.keyboard.press("Enter")
 
-        # 2. OTP Entry
-        self.log("\n👉 ACTION: Please check SMS.")
-        otp_code = self.input_handler("⌨️ Enter OTP code: ")
-        
-        try:
-            self.log(f"   -> Entering {otp_code}...")
-            try:
-                self.log("   -> Using specific OTP selector...")
-                page.locator('[data-qa-id="input-otp"]').fill(otp_code)
-            except:
-                self.log("   -> Specific OTP selector failed. Typing blindly...")
-                page.keyboard.type(otp_code)
+            # 2. OTP Entry
+            self.log("\n👉 ACTION: Please check SMS.")
+            otp_code = self.input_handler("⌨️ Enter OTP code: ")
             
-            time.sleep(0.5)
-            page.keyboard.press("Enter")
-        except Exception as e:
-            self.log(f"   -> OTP Entry error: {e}")
+            try:
+                self.log(f"   -> Entering {otp_code}...")
+                try:
+                    self.log("   -> Using specific OTP selector...")
+                    page.locator('[data-qa-id="input-otp"]').fill(otp_code)
+                except:
+                    self.log("   -> Specific OTP selector failed. Typing blindly...")
+                    page.keyboard.type(otp_code)
 
-        time.sleep(5)
+                time.sleep(0.5)
+                page.keyboard.press("Enter")
+            except Exception as e:
+                self.log(f"   -> OTP Entry error: {e}")
+
+            time.sleep(5)
+
+            # Save session
+            try:
+                page.context.storage_state(path="session.json")
+                self.log("   -> 💾 Session saved to session.json")
+            except Exception as e:
+                self.log(f"   -> ⚠️ Failed to save session: {e}")
         
         # 3. Wait Loop
         if self.target_time:
