@@ -179,27 +179,33 @@ class AINavigator:
             return []
 
 class SnappBot:
-    def __init__(self):
+    def __init__(self, input_handler=None, log_handler=None):
         self.ai = AINavigator()
         self.target_time = None
         self.target_product_name = DEFAULT_TARGET_NAME
+        self.input_handler = input_handler if input_handler else input
+        self.log_handler = log_handler if log_handler else print
+
+    def log(self, message):
+        if self.log_handler:
+            self.log_handler(message)
 
     def safe_goto(self, page, url, retries=2):
         """Helper to load pages with retries and better timeouts"""
         for i in range(retries):
             try:
-                print(f"   -> Loading {url} (Attempt {i+1})...")
+                self.log(f"   -> Loading {url} (Attempt {i+1})...")
                 page.goto(url, timeout=90000, wait_until='domcontentloaded') 
                 return True
             except PlaywrightTimeout:
-                print("   -> Timeout! Retrying...")
+                self.log("   -> Timeout! Retrying...")
             except Exception as e:
-                print(f"   -> Load error: {e}")
+                self.log(f"   -> Load error: {e}")
         return False
 
     def run(self):
         with sync_playwright() as p:
-            print(f"🚀 Launching Browser (Starting from Step {START_STEP})...")
+            self.log(f"🚀 Launching Browser (Starting from Step {START_STEP})...")
             browser = p.chromium.launch(
                 headless=HEADLESS_MODE,
                 args=['--no-sandbox', '--disable-setuid-sandbox']
@@ -213,16 +219,16 @@ class SnappBot:
             if START_STEP <= 1:
                 self.step_1_timetable(page)
             else:
-                print("⏩ Skipping Step 1 (Timetable)...")
+                self.log("⏩ Skipping Step 1 (Timetable)...")
                 if not self.target_time:
                     self.target_time = datetime.now().strftime("%H:%M")
-                    print(f"   -> Defaulted time to {self.target_time}")
+                    self.log(f"   -> Defaulted time to {self.target_time}")
 
             # --- STEP 2 LOGIC ---
             if START_STEP <= 2:
                 self.step_2_login(page)
             else:
-                print("⏩ Skipping Step 2 (Login)...")
+                self.log("⏩ Skipping Step 2 (Login)...")
 
             # --- STEP 3 LOGIC ---
             if START_STEP <= 3:
@@ -231,11 +237,11 @@ class SnappBot:
             browser.close()
 
     def step_1_timetable(self, page):
-        print("\n--- STEP 1: Reading Timetable ---")
+        self.log("\n--- STEP 1: Reading Timetable ---")
         url = "https://snapppay.ir/timetable/?utm_source=snapppay"
         
         if not self.safe_goto(page, url):
-            print("❌ Failed to load timetable. Skipping to Step 2 with default time.")
+            self.log("❌ Failed to load timetable. Skipping to Step 2 with default time.")
             self.target_time = datetime.now().strftime("%H:%M")
             return
 
@@ -244,15 +250,15 @@ class SnappBot:
         products = self.ai.extract_timetable(page)
         
         if products:
-            print("\n📋 Found Products in Timetable:")
-            print("="*40)
+            self.log("\n📋 Found Products in Timetable:")
+            self.log("="*40)
             for idx, p in enumerate(products):
-                print(f"   [{idx + 1}] {p.get('name', 'Unknown')} (Time: {p.get('time', '??')})")
-            print("="*40)
+                self.log(f"   [{idx + 1}] {p.get('name', 'Unknown')} (Time: {p.get('time', '??')})")
+            self.log("="*40)
             
             # Interactive Selection
             while True:
-                choice = input("\n👉 Enter the number of the product you want to buy (or 'skip' to use default): ")
+                choice = self.input_handler("\n👉 Enter the number of the product you want to buy (or 'skip' to use default): ")
                 if choice.lower() == 'skip':
                     break
                 if choice.strip().isdigit():
@@ -261,79 +267,79 @@ class SnappBot:
                         selected = products[idx]
                         self.target_product_name = selected.get('name', DEFAULT_TARGET_NAME)
                         self.target_time = selected.get('time')
-                        print(f"✅ Target Locked: {self.target_product_name}")
-                        print(f"⏰ Scheduled Time: {self.target_time}")
+                        self.log(f"✅ Target Locked: {self.target_product_name}")
+                        self.log(f"⏰ Scheduled Time: {self.target_time}")
                         return
                     else:
-                        print("❌ Invalid number. Please try again.")
+                        self.log("❌ Invalid number. Please try again.")
                 else:
-                    print("❌ Please enter a number.")
+                    self.log("❌ Please enter a number.")
         else:
-            print("⚠️ No products found by AI. Defaulting to IMMEDIATE mode.")
+            self.log("⚠️ No products found by AI. Defaulting to IMMEDIATE mode.")
 
         # Default fallback if list empty or skipped
         if not self.target_time:
             self.target_time = datetime.now().strftime("%H:%M")
-            print(f"⚠️ Using immediate time: {self.target_time}")
+            self.log(f"⚠️ Using immediate time: {self.target_time}")
 
     def step_2_login(self, page):
-        print("\n--- STEP 2: Login Flow ---")
+        self.log("\n--- STEP 2: Login Flow ---")
         if not self.safe_goto(page, "https://app.snapp.taxi/login"):
-            print("❌ Could not load login page.")
+            self.log("❌ Could not load login page.")
             return
 
         time.sleep(2)
         
         # 1. Fill Phone
         try:
-            print("   -> Trying specific aria-label selector...")
+            self.log("   -> Trying specific aria-label selector...")
             page.locator('[aria-label="شمارهٔ موبایل"]').fill(PHONE_NUMBER)
-            print("   -> Clicking submit button...")
+            self.log("   -> Clicking submit button...")
             page.locator('[aria-label="ثبت شماره موبایل"]').click()
         except:
             try:
-                print("   -> Specific selector failed. Trying generic...")
+                self.log("   -> Specific selector failed. Trying generic...")
                 page.locator("input[type='tel']").fill(PHONE_NUMBER)
                 page.keyboard.press("Enter")
             except:
-                print("   -> Generic failed. Asking AI...")
+                self.log("   -> Generic failed. Asking AI...")
                 selector_phone = self.ai.find_selector(page, "The input field for mobile number")
                 if selector_phone:
                     page.locator(selector_phone).first.fill(PHONE_NUMBER)
                     page.keyboard.press("Enter")
 
         # 2. OTP Entry
-        print("\n👉 ACTION: Please check SMS.")
-        otp_code = input("⌨️ Enter OTP code: ")
+        self.log("\n👉 ACTION: Please check SMS.")
+        otp_code = self.input_handler("⌨️ Enter OTP code: ")
         
         try:
-            print(f"   -> Entering {otp_code}...")
+            self.log(f"   -> Entering {otp_code}...")
             try:
-                print("   -> Using specific OTP selector...")
+                self.log("   -> Using specific OTP selector...")
                 page.locator('[data-qa-id="input-otp"]').fill(otp_code)
             except:
-                print("   -> Specific OTP selector failed. Typing blindly...")
+                self.log("   -> Specific OTP selector failed. Typing blindly...")
                 page.keyboard.type(otp_code)
             
             time.sleep(0.5)
             page.keyboard.press("Enter")
         except Exception as e:
-            print(f"   -> OTP Entry error: {e}")
+            self.log(f"   -> OTP Entry error: {e}")
 
         time.sleep(5)
         
         # 3. Wait Loop
         if self.target_time:
-            print(f"⏳ Waiting for Target Time: {self.target_time}...")
+            self.log(f"⏳ Waiting for Target Time: {self.target_time}...")
             while True:
                 current_time = datetime.now().strftime("%H:%M")
                 if current_time == self.target_time:
-                    print("🚨 TIME MATCHED! GO!")
+                    self.log("🚨 TIME MATCHED! GO!")
                     break
                 time.sleep(1)
 
     def step_3_purchase(self, page):
-        print("\n--- STEP 3: Purchase ---")
+        self.log("\n--- STEP 3: Purchase ---")
         
         campaign_urls = [
             "https://pl.snapp.ir/products?section_name=Campaign_Home&referrer=MAIN",
@@ -343,7 +349,7 @@ class SnappBot:
         product_found = False
 
         for url in campaign_urls:
-            print(f"   -> Checking Campaign URL: {url}")
+            self.log(f"   -> Checking Campaign URL: {url}")
             self.safe_goto(page, url)
             time.sleep(1)
 
@@ -355,29 +361,29 @@ class SnappBot:
             try:
                 with open(debug_filename, "w", encoding="utf-8") as f:
                     json.dump(products, f, ensure_ascii=False, indent=2)
-                print(f"   -> 💾 Saved {len(products)} products to {debug_filename}")
+                self.log(f"   -> 💾 Saved {len(products)} products to {debug_filename}")
             except Exception as e:
-                print(f"   -> ⚠️ Failed to save debug file: {e}")
+                self.log(f"   -> ⚠️ Failed to save debug file: {e}")
 
             # 3. SEARCH IN JSON
-            print(f"   -> Searching for '{self.target_product_name}' in extracted data...")
+            self.log(f"   -> Searching for '{self.target_product_name}' in extracted data...")
             target_selector = None
             
             for p in products:
                 # Case-insensitive partial match
                 if self.target_product_name.lower() in p.get('name', '').lower():
-                    print(f"   -> 🎯 Match Found: {p['name']}")
+                    self.log(f"   -> 🎯 Match Found: {p['name']}")
                     target_selector = p.get('selector')
                     break
             
             if target_selector:
                 try:
-                    print(f"   -> Clicking product using selector: {target_selector}")
+                    self.log(f"   -> Clicking product using selector: {target_selector}")
                     page.locator(target_selector).first.click()
                     product_found = True
                     break 
                 except Exception as e:
-                    print(f"   -> Click failed: {e}")
+                    self.log(f"   -> Click failed: {e}")
                     # Try fallback force click
                     try:
                         page.locator(target_selector).first.click(force=True)
@@ -386,10 +392,10 @@ class SnappBot:
                     except:
                         pass
             else:
-                 print("   -> Product match not found in extracted JSON list.")
+                 self.log("   -> Product match not found in extracted JSON list.")
         
         if not product_found:
-            print("❌ Product not found in any provided campaign URLs. Check 'debug_products_step3.json' to see what AI found.")
+            self.log("❌ Product not found in any provided campaign URLs. Check 'debug_products_step3.json' to see what AI found.")
             return
 
         time.sleep(3)
@@ -398,11 +404,11 @@ class SnappBot:
         selector_add = self.ai.find_selector(page, "The 'Add to Cart' button (Green/Blue button)")
         if selector_add:
             page.locator(selector_add).first.click()
-            print("✅ Added to cart.")
+            self.log("✅ Added to cart.")
             time.sleep(2)
         
         # 3. Checkout
-        print("Bot finished. Payment details would go here.")
+        self.log("Bot finished. Payment details would go here.")
 
 if __name__ == "__main__":
     bot = SnappBot()
