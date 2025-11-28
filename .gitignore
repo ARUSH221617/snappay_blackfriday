@@ -1,2 +1,6 @@
 debug_products.json
 .env
+__pycache__/
+*.pyc
+login_debug.html
+session.json
